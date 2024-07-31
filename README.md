@@ -4,7 +4,7 @@
 
 This is a simple web-based voice-to-text transcription application. The primary goal of this app is to test out transcription latency. 
 
-The app allows users to record audio by holding down the 'b' key, then automatically transcribes the audio using OpenAI's Whisper model. The app includes latency benchmarking to measure the performance of the transcription process after the user releases the key.
+The app allows users to record audio by holding down the `b` key, then automatically transcribes the audio using OpenAI's Whisper model on key release. The app includes latency benchmarking to measure the performance of the transcription process after the user releases the key.
 
 ## Features
 
