@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice to Text</title>
+    <style>
+        #message {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        #red-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        #red-dot.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="message">Hold b key to start recording</div>
+    <div id="red-dot" class="hidden"></div>
+    <p id="transcribed-text"></p>
+    <script src="script.js"></script>
+</body>
+</html>
