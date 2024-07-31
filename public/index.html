@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice to Text</title>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            max-width: 80%;
+        }
         #message {
             font-size: 24px;
             margin-bottom: 20px;
@@ -21,12 +38,21 @@
         #red-dot.hidden {
             display: none;
         }
+        #latency {
+            font-size: 18px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
-    <div id="message">Hold b key to start recording</div>
-    <div id="red-dot" class="hidden"></div>
-    <p id="transcribed-text"></p>
+    <div class="container">
+        <div id="message">Hold b key to start recording</div>
+        <div id="red-dot" class="hidden"></div>
+        <p id="latency"></p>
+        <p id="subtext"></p>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>

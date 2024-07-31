@@ -1,5 +1,6 @@
 const message = document.getElementById("message");
-const transcribedText = document.getElementById("transcribed-text");
+const subtext = document.getElementById("subtext");
+const latencyText = document.getElementById("latency");
 const redDot = document.getElementById("red-dot");
 
 let mediaRecorder;
@@ -18,6 +19,8 @@ navigator.mediaDevices
     mediaRecorder.addEventListener("start", () => {
       message.textContent = "Recording...";
       redDot.classList.remove("hidden");
+      subtext.textContent = "";
+      latencyText.textContent = "";
     });
 
     mediaRecorder.addEventListener("stop", () => {
@@ -43,14 +46,14 @@ navigator.mediaDevices
           })
           .then((data) => {
             console.log("Response from server:", data);
-            transcribedText.textContent = data.transcription;
-            message.textContent = "Hold b key to start recording";
+            message.textContent = data.transcription;
+            subtext.textContent = "Hold b key to start recording";
 
             // Calculate and display latency
             const endTime = performance.now();
             const latency = endTime - startTime;
             console.log(`Total latency: ${latency.toFixed(2)} ms`);
-            message.textContent += ` (Latency: ${latency.toFixed(2)} ms)`;
+            latencyText.textContent = ` (Latency: ${latency.toFixed(2)} ms)`;
           })
           .catch((error) => {
             console.error("Error:", error);
