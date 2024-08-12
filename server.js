@@ -63,6 +63,41 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
   }
 });
 
+// POST route to handle audio chunks
+app.post("/transcribe-chunk", upload.single("audio"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No audio chunk provided" });
+    }
+
+    const filePath = req.file.path;
+
+    try {
+      // Call the OpenAI API with the audio chunk
+      const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(filePath),
+        model: "whisper-1",
+      });
+
+      // Clean up the uploaded file
+      fs.unlinkSync(filePath);
+
+      // Send back the transcription of the chunk
+      res.json({ transcription: transcription.text });
+    } catch (error) {
+      console.error("OpenAI API Error:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to transcribe audio chunk", details: error.message });
+    }
+  } catch (error) {
+    console.error("Server Error:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to process audio chunk", details: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });

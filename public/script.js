@@ -5,12 +5,19 @@ const redDot = document.getElementById("red-dot");
 
 let mediaRecorder;
 let audioChunks = [];
-let startTime; // Add this line to store the start time
+let startTime;
+let chunkInterval;
+let transcriptionParts = [];
+let isRecording = false;
+let chunkSize = 2000; // Default chunk size in milliseconds
 
 navigator.mediaDevices
   .getUserMedia({ audio: true })
   .then((stream) => {
     mediaRecorder = new MediaRecorder(stream);
+
+    // Add event listener for chunk size input
+    document.getElementById('chunkSizeInput').addEventListener('change', updateChunkSize);
 
     mediaRecorder.addEventListener("dataavailable", (event) => {
       audioChunks.push(event.data);
@@ -67,29 +74,32 @@ navigator.mediaDevices
   });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "b") {
-    if (!mediaRecorder || mediaRecorder.state === "recording") return;
+  if (event.key === "b" && !isRecording) {
+    isRecording = true;
     audioChunks = [];
+    transcriptionParts = [];
     mediaRecorder.start();
+    startTime = performance.now();
+    chunkInterval = setInterval(sendAudioChunk, chunkSize); // Send chunk based on user-defined size
   }
 });
 
 document.addEventListener("keyup", (event) => {
-  if (
-    event.key === "b" &&
-    mediaRecorder &&
-    mediaRecorder.state === "recording"
-  ) {
+  if (event.key === "b" && isRecording) {
+    isRecording = false;
     mediaRecorder.stop();
+    clearInterval(chunkInterval);
+    sendAudioChunk(); // Send any remaining audio
+    finalizeTranscription();
   }
 });
 
-function convertToWav(audioBlob) {
+function convertToWav(audioChunks) {
   return new Promise((resolve, reject) => {
+    const blob = new Blob(audioChunks, { type: "audio/webm" });
     const reader = new FileReader();
     reader.onload = function (event) {
-      const audioContext = new (window.AudioContext ||
-        window.webkitAudioContext)();
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       audioContext
         .decodeAudioData(event.target.result)
         .then((buffer) => {
@@ -101,7 +111,7 @@ function convertToWav(audioBlob) {
         .catch(reject);
     };
     reader.onerror = reject;
-    reader.readAsArrayBuffer(audioBlob);
+    reader.readAsArrayBuffer(blob);
   });
 }
 
@@ -197,5 +207,50 @@ function floatTo16BitPCM(output, offset, input) {
 function writeString(view, offset, string) {
   for (var i = 0; i < string.length; i++) {
     view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function sendAudioChunk() {
+  if (audioChunks.length === 0) return;
+
+  const chunksToSend = audioChunks.splice(0, audioChunks.length);
+  convertToWav(chunksToSend).then((wavBlob) => {
+    const formData = new FormData();
+    formData.append("audio", wavBlob, "audio.wav");
+
+    fetch("/transcribe-chunk", {
+      method: "POST",
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        transcriptionParts.push(data.transcription);
+        updateTranscription();
+      })
+      .catch((error) => {
+        console.error("Error sending audio chunk:", error);
+      });
+  });
+}
+
+function updateTranscription() {
+  message.textContent = transcriptionParts.join(" ");
+}
+
+function finalizeTranscription() {
+  const endTime = performance.now();
+  const latency = endTime - startTime;
+  console.log(`Total latency: ${latency.toFixed(2)} ms`);
+  latencyText.textContent = ` (Latency: ${latency.toFixed(2)} ms)`;
+  subtext.textContent = "Hold b key to start recording";
+}
+
+function updateChunkSize() {
+  const newChunkSize = parseInt(document.getElementById('chunkSizeInput').value);
+  if (!isNaN(newChunkSize) && newChunkSize > 0) {
+    chunkSize = newChunkSize;
+    console.log(`Chunk size updated to ${chunkSize} ms`);
+  } else {
+    console.error('Invalid chunk size');
   }
 }
