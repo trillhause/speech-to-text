@@ -14,83 +14,115 @@ let chunkSize = 2000; // Default chunk size in milliseconds
 navigator.mediaDevices
   .getUserMedia({ audio: true })
   .then((stream) => {
-    mediaRecorder = new MediaRecorder(stream);
+    try {
+      mediaRecorder = new MediaRecorder(stream);
 
-    // Add event listener for chunk size input
-    document.getElementById('chunkSizeInput').addEventListener('change', updateChunkSize);
+      // Add event listener for chunk size input
+      document.getElementById('chunkSizeInput').addEventListener('change', updateChunkSize);
 
-    mediaRecorder.addEventListener("dataavailable", (event) => {
-      audioChunks.push(event.data);
-    });
-
-    mediaRecorder.addEventListener("start", () => {
-      message.textContent = "Recording...";
-      redDot.classList.remove("hidden");
-      subtext.textContent = "";
-      latencyText.textContent = "";
-    });
-
-    mediaRecorder.addEventListener("stop", () => {
-      message.textContent = "Processing audio...";
-      redDot.classList.add("hidden");
-      startTime = performance.now(); // Start timing when recording stops
-
-      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-      convertToWav(audioBlob).then((wavBlob) => {
-        const formData = new FormData();
-        formData.append("audio", wavBlob, "audio.wav");
-
-        console.log("Sending audio file to server...");
-        fetch("/transcribe", {
-          method: "POST",
-          body: formData,
-        })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-          })
-          .then((data) => {
-            console.log("Response from server:", data);
-            message.textContent = data.transcription;
-            subtext.textContent = "Hold b key to start recording";
-
-            // Calculate and display latency
-            const endTime = performance.now();
-            const latency = endTime - startTime;
-            console.log(`Total latency: ${latency.toFixed(2)} ms`);
-            latencyText.textContent = ` (Latency: ${latency.toFixed(2)} ms)`;
-          })
-          .catch((error) => {
-            console.error("Error:", error);
-            message.textContent = "Failed to process audio";
-          });
+      mediaRecorder.addEventListener("dataavailable", (event) => {
+        audioChunks.push(event.data);
       });
-    });
+
+      mediaRecorder.addEventListener("start", () => {
+        message.textContent = "Recording...";
+        redDot.classList.remove("hidden");
+        subtext.textContent = "";
+        latencyText.textContent = "";
+      });
+
+      mediaRecorder.addEventListener("stop", () => {
+        message.textContent = "Processing audio...";
+        redDot.classList.add("hidden");
+        startTime = performance.now(); // Start timing when recording stops
+
+        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+        convertToWav(audioBlob).then((wavBlob) => {
+          const formData = new FormData();
+          formData.append("audio", wavBlob, "audio.wav");
+
+          console.log("Sending audio file to server...");
+          fetch("/transcribe", {
+            method: "POST",
+            body: formData,
+          })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              return response.json();
+            })
+            .then((data) => {
+              console.log("Response from server:", data);
+              message.textContent = data.transcription;
+              subtext.textContent = "Hold b key to start recording";
+
+              // Calculate and display latency
+              const endTime = performance.now();
+              const latency = endTime - startTime;
+              console.log(`Total latency: ${latency.toFixed(2)} ms`);
+              latencyText.textContent = ` (Latency: ${latency.toFixed(2)} ms)`;
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+              message.textContent = "Failed to process audio";
+              subtext.textContent = "Please try again";
+            });
+        });
+      });
+
+      console.log("MediaRecorder initialized successfully");
+    } catch (error) {
+      console.error("Failed to initialize MediaRecorder:", error);
+      message.textContent = "Failed to initialize audio recording";
+      subtext.textContent = "Please check your microphone and try again";
+    }
   })
   .catch((error) => {
     console.error("getUserMedia error:", error);
+    message.textContent = "Failed to access microphone";
+    subtext.textContent = "Please check your microphone permissions and try again";
   });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "b" && !isRecording) {
-    isRecording = true;
-    audioChunks = [];
-    transcriptionParts = [];
-    mediaRecorder.start();
-    startTime = performance.now();
-    chunkInterval = setInterval(sendAudioChunk, chunkSize); // Send chunk based on user-defined size
+  if (event.key === "b" && !isRecording && mediaRecorder && mediaRecorder.state === "inactive") {
+    try {
+      isRecording = true;
+      audioChunks = [];
+      transcriptionParts = [];
+      mediaRecorder.start();
+      startTime = performance.now();
+      chunkInterval = setInterval(sendAudioChunk, chunkSize);
+      message.textContent = "Recording...";
+      redDot.classList.remove("hidden");
+      subtext.textContent = "Release 'b' key to stop recording";
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      isRecording = false;
+      message.textContent = "Error starting recording. Please try again.";
+      subtext.textContent = "Check your microphone and permissions";
+    }
   }
 });
 
 document.addEventListener("keyup", (event) => {
   if (event.key === "b" && isRecording) {
-    isRecording = false;
-    mediaRecorder.stop();
-    clearInterval(chunkInterval);
-    sendAudioChunk(); // Send any remaining audio
-    finalizeTranscription();
+    try {
+      isRecording = false;
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        clearInterval(chunkInterval);
+        sendAudioChunk(); // Send any remaining audio
+      }
+      finalizeTranscription();
+      message.textContent = "Processing audio...";
+      redDot.classList.add("hidden");
+      subtext.textContent = "Please wait...";
+    } catch (error) {
+      console.error("Error stopping recording:", error);
+      message.textContent = "Error processing audio. Please try again.";
+      subtext.textContent = "There was an issue with the recording";
+    }
   }
 });
 
@@ -214,27 +246,40 @@ function sendAudioChunk() {
   if (audioChunks.length === 0) return;
 
   const chunksToSend = audioChunks.splice(0, audioChunks.length);
-  convertToWav(chunksToSend).then((wavBlob) => {
-    const formData = new FormData();
-    formData.append("audio", wavBlob, "audio.wav");
+  convertToWav(chunksToSend)
+    .then((wavBlob) => {
+      const formData = new FormData();
+      formData.append("audio", wavBlob, "audio.wav");
 
-    fetch("/transcribe-chunk", {
-      method: "POST",
-      body: formData,
+      return fetch("/transcribe-chunk", {
+        method: "POST",
+        body: formData,
+      });
     })
-      .then((response) => response.json())
-      .then((data) => {
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (data.transcription) {
         transcriptionParts.push(data.transcription);
         updateTranscription();
-      })
-      .catch((error) => {
-        console.error("Error sending audio chunk:", error);
-      });
-  });
+      } else {
+        console.warn("Received empty transcription from server");
+      }
+    })
+    .catch((error) => {
+      console.error("Error sending or processing audio chunk:", error);
+      message.textContent = "Error processing audio. Please try again.";
+    });
 }
 
 function updateTranscription() {
   message.textContent = transcriptionParts.join(" ");
+  subtext.textContent = "Transcribing...";
+  redDot.classList.add("pulsing");
 }
 
 function finalizeTranscription() {
@@ -243,6 +288,10 @@ function finalizeTranscription() {
   console.log(`Total latency: ${latency.toFixed(2)} ms`);
   latencyText.textContent = ` (Latency: ${latency.toFixed(2)} ms)`;
   subtext.textContent = "Hold b key to start recording";
+  redDot.classList.add("hidden");
+  isRecording = false;
+  audioChunks = [];
+  transcriptionParts = [];
 }
 
 function updateChunkSize() {
